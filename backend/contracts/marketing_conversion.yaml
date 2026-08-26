@@ -1,0 +1,11 @@
+name: marketing_conversion
+definition: "Weekly marketing conversion rate by channel"
+calculation: "SUM(conversions) / SUM(clicks) by channel"
+grain: weekly
+refresh_cadence: weekly
+drivers: [channel]
+thresholds:
+  z_score_alert: 2.0
+  z_score_high_confidence: 2.5
+lineage_source: "synthetic_marketing.csv"
+access_roles: [cfo, regional_manager]

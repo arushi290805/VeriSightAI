@@ -47,7 +47,7 @@ export default function UploadPage() {
           <select 
             value={type} 
             onChange={e => setType(e.target.value)}
-            className="bg-slate-800 border border-slate-700 text-sm rounded-lg w-full p-2.5"
+            className="bg-white border border-slate-300 text-sm rounded-lg w-full p-2.5"
           >
             <option value="screenshot">Dashboard Screenshot (Gemini Vision)</option>
             <option value="csv">CSV File</option>
@@ -55,9 +55,9 @@ export default function UploadPage() {
         </div>
         
         <div className="flex items-center justify-center w-full">
-          <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-slate-700 border-dashed rounded-lg cursor-pointer bg-slate-800 hover:bg-slate-700">
+          <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-slate-50">
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <p className="mb-2 text-sm text-slate-400">
+              <p className="mb-2 text-sm text-slate-600">
                 <span className="font-semibold">Click to upload</span> or drag and drop
               </p>
               <p className="text-xs text-slate-500">{file ? file.name : (type === 'csv' ? 'CSV files only' : 'PNG/JPG only')}</p>
@@ -78,7 +78,7 @@ export default function UploadPage() {
           Upload and Parse
         </button>
         
-        {status && <div className="mt-4 p-4 bg-slate-800 rounded-lg text-sm">{status}</div>}
+        {status && <div className="mt-4 p-4 bg-white border border-slate-300 rounded-lg text-sm">{status}</div>}
       </form>
     </div>
   )

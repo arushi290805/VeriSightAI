@@ -16,6 +16,20 @@ class KPIRecordDB(Base):
     value = Column(Float)
     source_file = Column(String)
 
+from sqlalchemy import DateTime
+
+class TelemetryLogDB(Base):
+    __tablename__ = "telemetry_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, index=True)
+    step = Column(String)
+    model = Column(String)
+    tokens_in = Column(Integer)
+    tokens_out = Column(Integer)
+    latency_ms = Column(Float)
+    estimated_cost_usd = Column(Float)
+
 class KPIRecord(BaseModel):
     kpi_name: str
     date: date

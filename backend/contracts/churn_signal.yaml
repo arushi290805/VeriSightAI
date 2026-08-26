@@ -1,0 +1,11 @@
+name: churn_signal
+definition: "Weekly churn signal by product"
+calculation: "COUNT(churned_users) / COUNT(active_users) by product"
+grain: weekly
+refresh_cadence: weekly
+drivers: [product]
+thresholds:
+  z_score_alert: 2.0
+  z_score_high_confidence: 3.0
+lineage_source: "synthetic_churn.csv"
+access_roles: [cfo, regional_manager]
