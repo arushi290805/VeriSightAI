@@ -155,6 +155,10 @@ def get_project_narrative(
     from services.analytics import get_project_hypotheses
     import time
     
+    proj = db.query(ProjectDB).filter(ProjectDB.id == project_id).first()
+    if proj and proj.analysis and "custom_narrative" in proj.analysis:
+        return proj.analysis["custom_narrative"]
+        
     t_start = time.perf_counter()
     hypos = get_project_hypotheses(project_id, db)
     
@@ -320,3 +324,30 @@ def get_scenario(scenario_name: str, role: str = "regional_manager_apac", person
         "hypotheses": [h.model_dump() for h in hypos],
         "narrative": narrative
     }
+
+@app.post("/chat")
+def chat_endpoint(message: str = Form(...), project_id: Optional[int] = Form(None), db: Session = Depends(get_db)):
+    from google import genai
+    from core.gemini_rotator import rotator
+    from core.config import settings
+    
+    prompt = f"The user is a regional manager asking for suggestions about their KPIs. Please answer concisely and professionally. Question: {message}"
+    
+    if project_id:
+        proj = db.query(ProjectDB).filter(ProjectDB.id == project_id).first()
+        if proj and proj.analysis:
+            context_data = proj.analysis.get("custom_narrative", proj.analysis)
+            prompt = f"Context about the dataset and analysis:\n{context_data}\n\nThe user is a regional manager asking for suggestions about their data. Please answer concisely and professionally. Question: {message}"
+    
+    def _call(client):
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=prompt
+        )
+        return response.text
+
+    try:
+        res = rotator.execute_with_retry(_call)
+        return {"response": res}
+    except Exception as e:
+        return {"error": str(e), "response": "Sorry, I couldn't generate a response."}

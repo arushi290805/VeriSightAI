@@ -15,6 +15,45 @@ from models.schema import KPIRecordDB, ProjectDB
 from services.profiling import build_time_series, profile_csv
 
 
+def _generate_custom_narrative(df, advice_focus: str) -> Optional[dict]:
+    if not advice_focus:
+        return None
+    try:
+        csv_string = df.to_csv(index=False)
+        if len(csv_string) > 2000000:
+            csv_string = csv_string[:2000000]
+            
+        prompt = (
+            f"You are a senior data analyst. The user's goal/question is: '{advice_focus}'.\n"
+            f"Analyze the following dataset to answer their question directly. "
+            "Provide a JSON response with the following format:\n"
+            '{\n'
+            '  "kpi_summary": "Short summary answering the question",\n'
+            '  "executive_summary": "Detailed answer and predictions based on the data provided",\n'
+            '  "magnitude": "Normal/High/Critical",\n'
+            '  "confidence": "High",\n'
+            '  "recommended_actions": [\n'
+            '    {"driver": "...", "action": "...", "expected_impact": "..."}\n'
+            '  ]\n'
+            '}\n'
+            f"Dataset:\n{csv_string}"
+        )
+
+        def _call_gemini(client):
+            return client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(response_mime_type="application/json")
+            ).text
+
+        response_text = rotator.execute_with_retry(_call_gemini)
+        return json.loads(response_text)
+    except Exception as e:
+        print(f"Error generating custom narrative: {e}")
+        return None
+
+
+
 class ExtractedKPI(BaseModel):
     model_config = ConfigDict(extra="ignore")
     kpi_name: str = "metric"
@@ -22,7 +61,7 @@ class ExtractedKPI(BaseModel):
     date: Optional[str] = None
     grain: Optional[str] = None
     unit: Optional[str] = None
-    dimensions: dict = Field(default_factory=dict)
+    dimensions: Optional[dict] = Field(default_factory=dict)
     change: Optional[str] = None
 
 
@@ -131,6 +170,12 @@ def ingest_csv(
         "aggregation": profile["aggregation"],
         "series_points": {name: int(len(s)) for name, s in series_map.items()},
     }
+
+    if advice_focus:
+        custom_narrative = _generate_custom_narrative(df, advice_focus)
+        if custom_narrative:
+            analysis["custom_narrative"] = custom_narrative
+
 
     db.add_all(records)
     _update_project_analysis(db, project_id, profile["advice_focus"], analysis)

@@ -30,6 +30,33 @@ export default function DashboardClient() {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [selectedKpi, setSelectedKpi] = useState<string>('');
   const [chartVersion, setChartVersion] = useState<number>(Date.now());
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<{role: 'user'|'llm', text: string}[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const handleChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim()) return;
+    const msg = chatMessage;
+    setChatMessage('');
+    setChatHistory(prev => [...prev, {role: 'user', text: msg}]);
+    setChatLoading(true);
+
+    const formData = new FormData();
+    formData.append('message', msg);
+    if (projectId) formData.append('project_id', projectId);
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/chat', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Chat failed');
+      setChatHistory(prev => [...prev, {role: 'llm', text: data.response}]);
+    } catch (err: any) {
+      setChatHistory(prev => [...prev, {role: 'llm', text: 'Error: ' + err.message}]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   const dashboardAbortControllerRef = useRef<AbortController | null>(null);
   const telemetryAbortControllerRef = useRef<AbortController | null>(null);
@@ -455,32 +482,32 @@ export default function DashboardClient() {
 
           <div className="space-y-6">
             {uploadPanel}
-            <div className="card">
-              <h2 className="text-lg mb-3">Session cost</h2>
-              {telemetryLoading && !telemetry ? (
-                <p className="text-sm text-[var(--muted)]">Loading…</p>
-              ) : telemetryError ? (
-                <p className="text-sm">{telemetryError}</p>
-              ) : (
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <dt className="text-[var(--muted)]">Cost</dt>
-                    <dd>${telemetry?.total_cost_usd?.toFixed(6) || 0}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[var(--muted)]">Model calls</dt>
-                    <dd>{telemetry?.total_llm_calls || 0}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[var(--muted)]">Tokens in</dt>
-                    <dd>{telemetry?.total_tokens_in || 0}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[var(--muted)]">Avg latency</dt>
-                    <dd>{telemetry?.average_latency_ms?.toFixed(0) || 0} ms</dd>
-                  </div>
-                </dl>
-              )}
+            <div className="card flex flex-col" style={{ maxHeight: '600px' }}>
+              <h2 className="text-lg mb-3">Operator Chat</h2>
+              <div className="flex-grow overflow-y-auto mb-3 space-y-3 p-2 border border-[var(--line)] rounded" style={{ minHeight: '200px' }}>
+                {chatHistory.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]">Ask the LLM for suggestions...</p>
+                ) : (
+                  chatHistory.map((chat, idx) => (
+                    <div key={idx} className={`p-2 rounded text-sm ${chat.role === 'user' ? 'bg-[var(--moss-soft)] ml-4' : 'bg-[var(--background)] border border-[var(--line)] mr-4'}`}>
+                      <strong>{chat.role === 'user' ? 'You' : 'LLM'}: </strong>
+                      <span className="whitespace-pre-wrap">{chat.text}</span>
+                    </div>
+                  ))
+                )}
+                {chatLoading && <p className="text-sm text-[var(--muted)]">Thinking...</p>}
+              </div>
+              <form onSubmit={handleChat} className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder="Ask for suggestions..."
+                  className="field flex-grow"
+                  disabled={chatLoading}
+                />
+                <button type="submit" className="btn" disabled={chatLoading || !chatMessage.trim()}>Send</button>
+              </form>
             </div>
           </div>
         </div>

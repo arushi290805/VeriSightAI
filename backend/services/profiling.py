@@ -53,7 +53,7 @@ def _clean_numeric_series(series: pd.Series) -> pd.Series:
         return pd.to_numeric(series, errors="coerce")
     cleaned = (
         series.astype(str)
-        .str.replace(r"[\s$€£¥,%]", "", regex=True)
+        .str.replace(r"[\s$€£¥₹,%]", "", regex=True)
         .str.replace(",", "", regex=False)
         .replace({"": np.nan, "nan": np.nan, "none": np.nan, "-": np.nan})
     )
