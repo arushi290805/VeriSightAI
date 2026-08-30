@@ -1,5 +1,5 @@
 import json
-import google.generativeai as genai
+from google import genai
 from core.gemini_rotator import rotator
 from core.config import settings
 from services.evidence import Hypothesis
@@ -58,11 +58,11 @@ def generate_cfo_narrative(hypotheses: List[Hypothesis], business_impact_value: 
     evidence_json = json.dumps([h.model_dump(mode='json') for h in hypotheses])
     prompt = CFO_PROMPT.replace("{evidence_json}", evidence_json)
 
-    def _call():
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(response_mime_type="application/json")
+    def _call(client):
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(response_mime_type="application/json")
         )
         return response.text
 
@@ -78,11 +78,11 @@ def generate_regional_manager_narrative(hypotheses: List[Hypothesis]) -> Dict[st
     evidence_json = json.dumps([h.model_dump(mode='json') for h in hypotheses])
     prompt = REGIONAL_MANAGER_PROMPT.replace("{evidence_json}", evidence_json)
 
-    def _call():
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(response_mime_type="application/json")
+    def _call(client):
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(response_mime_type="application/json")
         )
         return response.text
 

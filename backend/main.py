@@ -1,22 +1,33 @@
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
 import shutil
 
-from data.db import Base, engine, get_db
+from data.db import Base, engine, get_db, ensure_schema
 from services.synthetic import seed_synthetic_data
 from services.ingestion import ingest_csv, ingest_screenshot
+from models.schema import ProjectDB, ProjectOut
+from services.analytics import build_project_dashboard
 
-# Create DB tables
 Base.metadata.create_all(bind=engine)
+ensure_schema()
+
+# Ensure static/charts directory exists
+os.makedirs(os.path.join("static", "charts"), exist_ok=True)
 
 app = FastAPI(title="BusinessIntelligence.ai Phase 1")
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this
+    allow_origins=["http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"], # In production, restrict this
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,54 +41,152 @@ def create_synthetic_data(db: Session = Depends(get_db)):
 
 @app.post("/upload/csv")
 def upload_csv(
-    kpi_name: str = Form(...),
-    grain: str = Form(...),
-    date_col: str = Form(...),
-    value_col: str = Form(...),
-    dimension_cols: str = Form(...), # Comma separated
     file: UploadFile = File(...),
+    project_id: Optional[int] = Form(None),
+    advice_focus: str = Form(""),
+    kpi_name: Optional[str] = Form(None),
+    grain: Optional[str] = Form(None),
+    date_col: Optional[str] = Form(None),
+    value_col: Optional[str] = Form(None),
+    dimension_cols: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Upload and ingest a CSV file."""
-    if not file.filename.endswith('.csv'):
+    """Upload a CSV. Column mapping is optional; analysis is driven by advice_focus."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
-    
-    file_location = f"./temp_{file.filename}"
+
+    file_location = f"./temp_{os.path.basename(file.filename)}"
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
-        
-    dim_cols = [c.strip() for c in dimension_cols.split(",") if c.strip()]
-    
+
+    dim_cols = [c.strip() for c in (dimension_cols or "").split(",") if c.strip()]
+
     try:
-        count = ingest_csv(file_location, kpi_name, grain, date_col, value_col, dim_cols, db)
+        result = ingest_csv(
+            file_location,
+            db,
+            project_id=project_id,
+            advice_focus=advice_focus,
+            kpi_name=kpi_name,
+            grain=grain,
+            date_col=date_col,
+            value_col=value_col,
+            dimension_cols=dim_cols,
+        )
     except Exception as e:
-        os.remove(file_location)
+        if os.path.exists(file_location):
+            os.remove(file_location)
         raise HTTPException(status_code=500, detail=str(e))
-        
+
     os.remove(file_location)
-    return {"message": f"Successfully ingested {count} records."}
+    return {
+        "message": f"Ingested {result['count']} aggregated records. Analyzing {result['analysis'].get('target')} against related fields.",
+        "analysis": result["analysis"],
+    }
+
 
 @app.post("/upload/screenshot")
 def upload_screenshot(
     file: UploadFile = File(...),
+    project_id: Optional[int] = Form(None),
+    advice_focus: str = Form(""),
     db: Session = Depends(get_db)
 ):
-    """Upload and ingest a dashboard screenshot."""
-    if not (file.filename.endswith('.png') or file.filename.endswith('.jpg') or file.filename.endswith('.jpeg')):
-        raise HTTPException(status_code=400, detail="Only PNG/JPG files are allowed.")
-        
-    file_location = f"./temp_{file.filename}"
+    """Upload and ingest a dashboard screenshot of any layout."""
+    name = (file.filename or "").lower()
+    if not name.endswith((".png", ".jpg", ".jpeg", ".webp")):
+        raise HTTPException(status_code=400, detail="Only PNG/JPG/WebP files are allowed.")
+
+    file_location = f"./temp_{os.path.basename(file.filename)}"
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
-        
+
     try:
-        count = ingest_screenshot(file_location, db)
+        result = ingest_screenshot(file_location, db, project_id=project_id, advice_focus=advice_focus)
     except Exception as e:
-        os.remove(file_location)
+        if os.path.exists(file_location):
+            os.remove(file_location)
         raise HTTPException(status_code=500, detail=str(e))
-        
+
     os.remove(file_location)
-    return {"message": f"Successfully ingested {count} records from screenshot."}
+    return {
+        "message": f"Read {result['count']} metrics from the screenshot.",
+        "analysis": result["analysis"],
+    }
+
+
+@app.post("/projects", response_model=ProjectOut)
+def create_project(name: str = Form(...), description: str = Form(""), db: Session = Depends(get_db)):
+    proj = ProjectDB(name=name.strip(), description=description or "")
+    db.add(proj)
+    db.commit()
+    db.refresh(proj)
+    return proj
+
+
+@app.get("/projects", response_model=List[ProjectOut])
+def list_projects(db: Session = Depends(get_db)):
+    return db.query(ProjectDB).all()
+
+
+@app.get("/projects/{project_id}", response_model=ProjectOut)
+def get_project(project_id: int, db: Session = Depends(get_db)):
+    proj = db.query(ProjectDB).filter(ProjectDB.id == project_id).first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return proj
+
+@app.get("/projects/{project_id}/dashboard")
+def get_project_dashboard(
+    project_id: int, 
+    role: str = "regional_manager_apac", 
+    persona: str = "regional_manager", 
+    db: Session = Depends(get_db)
+):
+    return build_project_dashboard(project_id, role, persona, db)
+
+@app.get("/projects/{project_id}/narrative")
+def get_project_narrative(
+    project_id: int, 
+    role: str = "regional_manager_apac", 
+    persona: str = "regional_manager", 
+    db: Session = Depends(get_db)
+):
+    from services.analytics import get_project_hypotheses
+    import time
+    
+    t_start = time.perf_counter()
+    hypos = get_project_hypotheses(project_id, db)
+    
+    t_gemini_start = time.perf_counter()
+    narrative = None
+    if hypos:
+        if persona == "cfo":
+            narrative = generate_cfo_narrative(hypos, business_impact_value=25000.0)
+        else:
+            narrative = generate_regional_manager_narrative(hypos)
+    else:
+        narrative = {
+            "kpi_summary": "All KPIs are operating within standard historical baselines.",
+            "executive_summary": "No statistical anomalies detected. Operating parameters are normal.",
+            "magnitude": "Normal",
+            "confidence": "High",
+            "recommended_actions": [
+                {
+                    "driver": "Baseline operations",
+                    "action": "Maintain current operational monitoring schedule.",
+                    "expected_impact": "Operational stability"
+                }
+            ]
+        }
+    t_gemini_ms = (time.perf_counter() - t_gemini_start) * 1000
+    t_total_ms = (time.perf_counter() - t_start) * 1000
+    
+    print(f"[PERF] Gemini request: {t_gemini_ms:.1f} ms")
+    print(f"[PERF] Total narrative endpoint: {t_total_ms:.1f} ms")
+    
+    return narrative
+
 
 @app.get("/health")
 def health_check():
@@ -101,6 +210,8 @@ def get_revenue_data(role: str = Header(default="global_cfo", alias="X-Role"), d
                 "date": r.date,
                 "value": r.value,
                 "dimensions": r.dimensions
+            }
+            for r in filtered_records
         ]
     }
 

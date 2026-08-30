@@ -1,5 +1,18 @@
+import { Source_Sans_3, Fraunces } from 'next/font/google'
 import './globals.css'
 import type { Metadata } from 'next'
+
+const sans = Source_Sans_3({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+})
+
+const serif = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-serif',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'VeriSight AI',
@@ -12,15 +25,21 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-[#F5F5DC] text-slate-900">
-        <main className="container mx-auto p-4">
-          <nav className="flex gap-4 mb-8 border-b border-slate-700 pb-4">
-            <a href="/" className="hover:text-blue-400 font-bold">Dashboard</a>
-            <a href="/upload" className="hover:text-blue-400">Upload Data</a>
-          </nav>
-          {children}
-        </main>
+    <html lang="en" className={`${sans.variable} ${serif.variable}`}>
+      <body>
+        <header className="site-header">
+          <div className="site-header-inner">
+            <a href="/" className="brand">
+              VeriSight
+            </a>
+            <nav className="nav-links">
+              <a href="/">Projects</a>
+              <a href="/dashboard">Dashboard</a>
+              <a href="/upload">Upload</a>
+            </nav>
+          </div>
+        </header>
+        <main className="page-shell">{children}</main>
       </body>
     </html>
   )

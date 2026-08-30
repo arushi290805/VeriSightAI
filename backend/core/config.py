@@ -1,10 +1,13 @@
 import os
 import pydantic
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Settings(pydantic.BaseModel):
     GEMINI_API_KEYS: str = os.getenv("GEMINI_API_KEYS", "")
-    GEMINI_MODEL: str = "gemini-2.0-flash"
-    GEMINI_PRICE_PER_1K_TOKENS: float = 0.00015 # Based on current gemini-2.0-flash pricing
+    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_PRICE_PER_1K_TOKENS: float = 0.00015 # Based on current pricing
 
 settings = Settings()
 

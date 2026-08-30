@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pandas
+numpy
+google-genai
+Pillow
+python-multipart
+pytest
+python-dotenv
+pyyaml
+seaborn
+matplotlib
+scipy

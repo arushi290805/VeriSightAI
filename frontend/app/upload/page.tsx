@@ -1,85 +1,96 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import UploadForm from '../components/UploadForm'
 
 export default function UploadPage() {
+  const [projects, setProjects] = useState<any[]>([])
+  const [selectedProject, setSelectedProject] = useState('')
   const [file, setFile] = useState<File | null>(null)
-  const [type, setType] = useState('screenshot')
+  const [type, setType] = useState('csv')
+  const [adviceFocus, setAdviceFocus] = useState('')
   const [status, setStatus] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/projects')
+        if (res.ok) {
+          const data = await res.json()
+          setProjects(data)
+          if (data.length > 0) setSelectedProject(data[0].id.toString())
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    fetchProjects()
+  }, [])
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) return
+    if (!file || !selectedProject) return
+    setLoading(true)
+    setStatus('Reading the file. Large spreadsheets are aggregated first so this should not hang.')
 
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('project_id', selectedProject)
+    formData.append('advice_focus', adviceFocus)
 
-    let url = 'http://localhost:8000/upload/screenshot'
-    if (type === 'csv') {
-      url = 'http://localhost:8000/upload/csv'
-      formData.append('kpi_name', 'revenue')
-      formData.append('grain', 'daily')
-      formData.append('date_col', 'date')
-      formData.append('value_col', 'value')
-      formData.append('dimension_cols', 'region,product')
-    }
+    const url = type === 'csv'
+      ? 'http://127.0.0.1:8000/upload/csv'
+      : 'http://127.0.0.1:8000/upload/screenshot'
 
     try {
-      setStatus('Uploading...')
-      const res = await fetch(url, {
-        method: 'POST',
-        body: formData,
-      })
+      const res = await fetch(url, { method: 'POST', body: formData })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Upload failed')
-      setStatus('Success: ' + data.message)
+      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Upload failed')
+      const extra = data.analysis?.target ? ` Focus metric: ${data.analysis.target}.` : ''
+      setStatus((data.message || 'Done.') + extra)
+      setFile(null)
     } catch (err: any) {
-      setStatus('Error: ' + err.message)
+      setStatus('Could not finish the upload: ' + err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-6">Upload Data</h1>
-      <form onSubmit={handleUpload} className="space-y-4">
-        <div>
-          <label className="block mb-2 text-sm font-medium">Upload Type</label>
-          <select 
-            value={type} 
-            onChange={e => setType(e.target.value)}
-            className="bg-white border border-slate-300 text-sm rounded-lg w-full p-2.5"
-          >
-            <option value="screenshot">Dashboard Screenshot (Gemini Vision)</option>
-            <option value="csv">CSV File</option>
-          </select>
-        </div>
-        
-        <div className="flex items-center justify-center w-full">
-          <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-slate-50">
-            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <p className="mb-2 text-sm text-slate-600">
-                <span className="font-semibold">Click to upload</span> or drag and drop
-              </p>
-              <p className="text-xs text-slate-500">{file ? file.name : (type === 'csv' ? 'CSV files only' : 'PNG/JPG only')}</p>
+      <h1 className="text-3xl mb-2">Upload</h1>
+      <p className="text-[var(--muted)] mb-6">
+        Spreadsheets do not need date/value/dimension mapping. Screenshots do not need a specific dashboard layout.
+      </p>
+      <div className="card">
+        {projects.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">Create a project on the home page first.</p>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="label">Project</label>
+              <select className="field" value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
-            <input 
-              type="file" 
-              className="hidden" 
-              accept={type === 'csv' ? '.csv' : '.png,.jpg,.jpeg'}
-              onChange={e => setFile(e.target.files?.[0] || null)}
+            <UploadForm
+              projectId={selectedProject}
+              uploadType={type}
+              setUploadType={setType}
+              adviceFocus={adviceFocus}
+              setAdviceFocus={setAdviceFocus}
+              file={file}
+              setFile={setFile}
+              loading={loading}
+              status={status}
+              onSubmit={handleUpload}
             />
-          </label>
-        </div>
-        
-        <button 
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
-        >
-          Upload and Parse
-        </button>
-        
-        {status && <div className="mt-4 p-4 bg-white border border-slate-300 rounded-lg text-sm">{status}</div>}
-      </form>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

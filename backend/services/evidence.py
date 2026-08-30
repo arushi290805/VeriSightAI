@@ -2,7 +2,8 @@ from pydantic import BaseModel
 from typing import List, Literal, Dict, Any, Optional
 from datetime import datetime
 import json
-import google.generativeai as genai
+import google.genai as genai
+from google import genai
 from core.gemini_rotator import rotator
 from core.config import settings
 import hashlib
@@ -134,11 +135,11 @@ def retrieve_unstructured_evidence(text_snippets: List[Dict[str, str]], dimensio
     Do not output markdown blocks or any other text.
     """
 
-    def _call_gemini():
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
+    def _call_gemini(client):
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(
                 response_mime_type="application/json"
             )
         )

@@ -76,9 +76,8 @@ def detect_anomaly(kpi_name: str, grain: str, history: List[float], current_valu
     Main detection logic combining z-score, sparse history rules, and thresholds.
     """
     contract = CONTRACTS.get(kpi_name)
-    if not contract:
-        raise ValueError(f"Contract not found for KPI {kpi_name}")
-        
+    z_alert = contract.thresholds.z_score_alert if contract else 2.0
+
     window = get_window_size(grain)
     recent_history = history[-window:] if len(history) >= window else history
     
@@ -98,7 +97,7 @@ def detect_anomaly(kpi_name: str, grain: str, history: List[float], current_valu
         
     z, mean, std = compute_z_score(recent_history, current_value)
     
-    is_anomaly = abs(z) > contract.thresholds.z_score_alert
+    is_anomaly = abs(z) > z_alert
     score = calculate_anomaly_score(z, recent_history, mean, std, deviation_value, baseline_value)
     
     return {
