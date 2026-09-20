@@ -20,3 +20,5 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+PROJECT_STRUCTURE_AND_PIPELINE.md
