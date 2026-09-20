@@ -70,17 +70,6 @@ dependencies:
    `frontend` folder. The application will be available at
    http://localhost:3000/dashboard.
 
-
-## Troubleshooting
-
-If the application fails to start or process data, check the following:
-
-- Are you using the correct Node.js version? Ensure you are using v18+.
-- Is the Gemini API key valid? Verify that the `.env` file is properly configured.
-- Is the backend server running when accessing the frontend? The frontend
-  requires the API on port 8000.
-
-
 ## FAQ
 
 **Q: How does the hybrid architecture work?**
@@ -100,3 +89,4 @@ API costs, and Secure Access Control using mock role-based row-level filters.
 ## Maintainers
 
 - Raghav Ratan Yadav
+- Arushi Khare
