@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import UploadForm from '../components/UploadForm'
+import { API_BASE } from '../../lib/config'
 
 export default function UploadPage() {
   const [projects, setProjects] = useState<any[]>([])
@@ -15,7 +16,7 @@ export default function UploadPage() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/projects')
+        const res = await fetch(`${API_BASE}/projects`)
         if (res.ok) {
           const data = await res.json()
           setProjects(data)
@@ -40,8 +41,8 @@ export default function UploadPage() {
     formData.append('advice_focus', adviceFocus)
 
     const url = type === 'csv'
-      ? 'http://127.0.0.1:8000/upload/csv'
-      : 'http://127.0.0.1:8000/upload/screenshot'
+      ? `${API_BASE}/upload/csv`
+      : `${API_BASE}/upload/screenshot`
 
     try {
       const res = await fetch(url, { method: 'POST', body: formData })

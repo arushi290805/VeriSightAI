@@ -22,13 +22,22 @@ app = FastAPI(title="BusinessIntelligence.ai Phase 1")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000",
+# Read CORS origins from environment variable (comma-separated or wildcard)
+cors_env = os.getenv("CORS_ORIGINS", "")
+if cors_env:
+    allow_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+else:
+    allow_origins = [
+        "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
-        "http://127.0.0.1:8000"], # In production, restrict this
-    allow_credentials=True,
+        "http://127.0.0.1:8000",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins if allow_origins != ["*"] else ["*"],
+    allow_credentials=True if allow_origins != ["*"] else False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

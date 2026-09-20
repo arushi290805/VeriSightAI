@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import UploadForm from '../components/UploadForm';
+import { API_BASE } from '../../lib/config';
 
 export default function DashboardClient() {
   const searchParams = useSearchParams();
@@ -47,7 +48,7 @@ export default function DashboardClient() {
     if (projectId) formData.append('project_id', projectId);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/chat', { method: 'POST', body: formData });
+      const res = await fetch(`${API_BASE}/chat`, { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Chat failed');
       setChatHistory(prev => [...prev, {role: 'llm', text: data.response}]);
@@ -80,7 +81,7 @@ export default function DashboardClient() {
 
   const fetchProjectInfo = async (pid: string) => {
     try {
-      const res = await fetchWithTimeout(`http://127.0.0.1:8000/projects/${pid}`);
+      const res = await fetchWithTimeout(`${API_BASE}/projects/${pid}`);
       if (res.ok) setProjectInfo(await res.json());
     } catch (e) {
       console.error('Failed to fetch project info:', e);
@@ -89,7 +90,7 @@ export default function DashboardClient() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetchWithTimeout('http://127.0.0.1:8000/projects');
+      const res = await fetchWithTimeout(`${API_BASE}/projects`);
       if (res.ok) {
         const data = await res.json();
         setProjectList(data);
@@ -111,7 +112,7 @@ export default function DashboardClient() {
     setDashboardError(null);
     try {
       const res = await fetchWithTimeout(
-        `http://127.0.0.1:8000/projects/${pid}/dashboard?role=${role}&persona=${persona}`,
+        `${API_BASE}/projects/${pid}/dashboard?role=${role}&persona=${persona}`,
         { signal: controller.signal }
       );
       if (!res.ok) throw new Error(`Failed to load dashboard: ${res.statusText}`);
@@ -137,7 +138,7 @@ export default function DashboardClient() {
     setTelemetryLoading(true);
     setTelemetryError(null);
     try {
-      const res = await fetchWithTimeout('http://127.0.0.1:8000/telemetry/summary', { signal: controller.signal });
+      const res = await fetchWithTimeout(`${API_BASE}/telemetry/summary`, { signal: controller.signal });
       if (!res.ok) throw new Error('Failed to load telemetry summary');
       setTelemetry(await res.json());
     } catch (e: any) {
@@ -155,7 +156,7 @@ export default function DashboardClient() {
     setNarrativeError(null);
     try {
       const res = await fetchWithTimeout(
-        `http://127.0.0.1:8000/projects/${pid}/narrative?role=${role}&persona=${persona}`,
+        `${API_BASE}/projects/${pid}/narrative?role=${role}&persona=${persona}`,
         { signal: controller.signal },
         40000
       );
@@ -200,8 +201,8 @@ export default function DashboardClient() {
     formData.append('project_id', projectId);
     formData.append('advice_focus', adviceFocus);
     const url = uploadType === 'csv'
-      ? 'http://127.0.0.1:8000/upload/csv'
-      : 'http://127.0.0.1:8000/upload/screenshot';
+      ? `${API_BASE}/upload/csv`
+      : `${API_BASE}/upload/screenshot`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 180000);
@@ -312,7 +313,7 @@ export default function DashboardClient() {
               </div>
               {selectedKpi && dashboardData?.charts?.[selectedKpi] ? (
                 <img
-                  src={`http://127.0.0.1:8000${dashboardData.charts[selectedKpi]}?t=${chartVersion}`}
+                  src={`${API_BASE}${dashboardData.charts[selectedKpi]}?t=${chartVersion}`}
                   alt={`${selectedKpi} trend`}
                   className="w-full h-auto"
                 />
